@@ -17,17 +17,8 @@ This rule feeds a built image and a set of config files
 to the container structure test framework."
 """
 
-load("//container:flatten.bzl", "container_flatten")
-
 def _impl(ctx):
-    flat_image = ctx.attr.image
-
-    config_runfiles = []
-    config_str = ""
-
-    for config_file in ctx.files.configs:
-        config_runfiles.append(config_file)
-        config_str = config_str + '$(pwd)/' + config_file.short_path + ' '
+    config_str = ' '.join(['$(pwd)/' + c.short_path for c in ctx.files.configs])
 
     image_name = "bazel/%s:%s" % (ctx.attr.image.label.package, ctx.attr.image.label.name)
 
@@ -51,10 +42,9 @@ def _impl(ctx):
             ctx.executable.image] +
             ctx.attr.image.files.to_list() +
             ctx.attr.image.data_runfiles.files.to_list() +
-            config_runfiles,
+            ctx.files.configs,
         ),
     )
-
 
 container_test = rule(
     attrs = {
@@ -84,8 +74,8 @@ container_test = rule(
         ),
         "_structure_test_tpl": attr.label(
             default = Label("//container:structure-test.sh.tpl"),
-            allow_files=True,
-            single_file=True
+            allow_files = True,
+            single_file = True,
         ),
     },
     executable = True,
