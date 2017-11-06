@@ -17,10 +17,12 @@ This rule feeds a built image and a set of config files
 to the container structure test framework."
 """
 
+load("//container:bundle.bzl", "container_bundle")
+
 def _impl(ctx):
     config_str = ' '.join(['$(pwd)/' + c.short_path for c in ctx.files.configs])
 
-    image_name = "bazel/%s:%s" % (ctx.attr.image.label.package, ctx.attr.image.label.name)
+    # image_name = "bazel/%s:%s" % (ctx.attr.image.label.package, ctx.attr.image.label.name)
 
     # Generate a shell script to execute structure_tests with the correct flags.
     ctx.actions.expand_template(
@@ -32,7 +34,8 @@ def _impl(ctx):
           "%{configs}": config_str,
           "%{workspace_name}": ctx.workspace_name,
           "%{test_executable}": ctx.executable._structure_test.short_path,
-          "%{image}": image_name,
+          # "%{image}": image_name,
+          "%{image}": ctx.attr.image
         },
         is_executable=True
     )
@@ -46,7 +49,7 @@ def _impl(ctx):
         ),
     )
 
-container_test = rule(
+_container_test = rule(
     attrs = {
         "image": attr.label(
             executable = True,
@@ -82,3 +85,22 @@ container_test = rule(
     test = True,
     implementation = _impl,
 )
+
+
+def container_test(name, image, configs, driver=None, verbose=None):
+    intermediate_image_name = "%s.intermediate" % image
+
+    container_bundle(
+        name = "intermediate_bundle",
+        images = {
+            intermediate_image_name: image,
+        }
+    )
+
+    _container_test(
+        name = name,
+        image = intermediate_image_name,
+        configs = configs,
+        verbose = verbose,
+        driver = driver,
+    )
