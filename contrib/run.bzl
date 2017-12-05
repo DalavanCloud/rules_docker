@@ -13,8 +13,11 @@
 # limitations under the License.
 
 """
-A rule to run a command inside a container, and commit the result.
-Returns the image id of the committed container.
+Rules to run a command inside a container, and either commit the result
+to new container image, or extract specified targets to a directory on
+the host machine.
+
+Both return the image id of the committed container.
 """
 
 load(
@@ -23,7 +26,11 @@ load(
 )
 
 
-def _impl(ctx):
+def _extract_impl(ctx):
+    return 0
+
+
+def _commit_impl(ctx):
     # Since we're always bundling/renaming the image in the macro, this is valid.
     load_statement = 'docker load -i %s' % ctx.file.image_tar.short_path
     image_name = ctx.attr.image_name
@@ -60,7 +67,7 @@ def _impl(ctx):
     )
 
 
-_container_run = rule(
+_run_and_commit = rule(
     attrs = {
         "flags": attr.string_list(
             doc = "list of flags to pass to run command",
@@ -96,7 +103,43 @@ _container_run = rule(
 )
 
 
-def container_run(name, image, command, flags=None):
+_run_and_extract = rule(
+    attrs = {
+        "flags": attr.string_list(
+            doc = "list of flags to pass to run command",
+            default = ['-d', '-t', '--privileged'],
+        ),
+        "image_tar": attr.label(
+            executable = True,
+            allow_files = True,
+            mandatory = True,
+            single_file = True,
+            cfg = "target",
+        ),
+        "image_name": attr.string(
+            doc = "name of image to run commands on",
+            mandatory = True,
+        ),
+        "command": attr.string_list(
+            doc = "command to run",
+            mandatory = True,
+            non_empty = True,
+        ),
+        "_run_tpl": attr.label(
+            default = Label("//contrib:docker_run.sh.tpl"),
+            allow_files = True,
+            single_file = True,
+        ),
+        # "output": attr.output(
+        #     mandatory = True,
+        # )
+    },
+    executable = True,
+    implementation = _impl,
+)
+
+
+def container_run_and_commit(name, image, command, flags=None):
     """A macro to predictably rename the image under test before threading
     it to the container test rule."""
     intermediate_image_name = "%s:intermediate" % image.replace(':', '').replace('@', '').replace('/', '')
@@ -112,7 +155,7 @@ def container_run(name, image, command, flags=None):
         }
     )
 
-    _container_run(
+    _run_and_commit(
         name = name,
         image_name = intermediate_image_name,
         image_tar = image_tar_name + ".tar",
@@ -120,3 +163,13 @@ def container_run(name, image, command, flags=None):
         command = command,
         # output = output,
     )
+
+
+def container_run_and_extract():
+    return 0
+
+
+def _rename_image():
+    # use this as shared helper code to bundle
+    # and return name of new image
+    return 0
